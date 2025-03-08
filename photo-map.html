@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Photo Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    #drop-zone {
+      width: 300px;
+      height: 100px;
+      border: 2px dashed #ccc;
+      text-align: center;
+      padding: 20px;
+      margin: 20px;
+    }
+    #map {
+      height: 400px;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div id="drop-zone">Drag and drop a photo here</div>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
+  <script>
+    const dropZone = document.getElementById('drop-zone');
+    let map = L.map('map').setView([0, 0], 2); // Default map view
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    dropZone.addEventListener('dragover', (e) => e.preventDefault());
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const imgUrl = event.target.result;
+
+          // Extract EXIF data
+          EXIF.getData(file, function() {
+            const lat = EXIF.getTag(this, 'GPSLatitude');
+            const lon = EXIF.getTag(this, 'GPSLongitude');
+            if (lat && lon) {
+              // Convert EXIF GPS format (degrees, minutes, seconds) to decimal
+              const latDecimal = lat[0] + lat[1]/60 + lat[2]/3600;
+              const lonDecimal = lon[0] + lon[1]/60 + lon[2]/3600;
+              const latRef = EXIF.getTag(this, 'GPSLatitudeRef') || 'N';
+              const lonRef = EXIF.getTag(this, 'GPSLongitudeRef') || 'E';
+              const finalLat = latRef === 'N' ? latDecimal : -latDecimal;
+              const finalLon = lonRef === 'E' ? lonDecimal : -lonDecimal;
+
+              // Update map
+              map.setView([finalLat, finalLon], 10);
+              const marker = L.marker([finalLat, finalLon]).addTo(map);
+              marker.bindPopup(`<img src="${imgUrl}" style="width: 100px;" />`).openPopup();
+            } else {
+              alert('No GPS data found in this photo!');
+            }
+          });
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  </script>
+</body>
+</html>
